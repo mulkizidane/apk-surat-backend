@@ -133,7 +133,7 @@ class App extends BaseConfig
      * @see https://www.php.net/manual/en/timezones.php for list of timezones
      *      supported by PHP.
      */
-    public string $appTimezone = 'UTC';
+    public string $appTimezone = 'Asia/Jakarta';
 
     /**
      * --------------------------------------------------------------------------
@@ -199,17 +199,4 @@ class App extends BaseConfig
      * @see http://www.w3.org/TR/CSP/
      */
     public bool $CSPEnabled = false;
-
-    public array $cors = [
-        // Izinkan origin dari Live Server frontend-mu
-        'allowedOrigins' => ['http://localhost:3000'],
-
-        // Izinkan semua metode API yang kita pakai
-        'allowedMethods' => ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-
-        // Izinkan frontend mengirim header Content-Type (untuk JSON) dan Authorization (untuk token JWT)
-        'allowedHeaders' => ['Content-Type', 'Authorization', 'X-Requested-With'],
-
-        'maxAge' => 3600,
-    ];
 }
