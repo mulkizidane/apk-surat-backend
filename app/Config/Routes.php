@@ -43,5 +43,8 @@ $routes->group('api', ['filter' => 'jwt'], static function ($routes) {
 
     // Disposisi (sebagai sub-resource dari surat-masuk)
     $routes->post('surat-masuk/(:num)/disposisi', 'DisposisiController::create/$1');
+    $routes->get('kategori-surat', 'KategoriSuratController::index');
+    $routes->get('jenis-surat', 'JenisSuratController::index');
+    $routes->get('tujuan-data', 'UnitController::getTujuanData');
     
 });

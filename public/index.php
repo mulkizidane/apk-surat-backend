@@ -4,7 +4,7 @@ use CodeIgniter\Boot;
 use Config\Paths;
 
 
-header("Access-Control-Allow-Origin: http://localhost:3000"); // Mengizinkan semua origin (untuk development)
+header("Access-Control-Allow-Origin: *"); // Mengizinkan semua origin (untuk development)
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
