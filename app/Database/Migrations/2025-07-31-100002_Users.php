@@ -7,50 +7,21 @@ use CodeIgniter\Database\Migration;
 class Users extends Migration
 {
     public function up()
-    {
+    {// Migration for: users
         $this->forge->addField([
-            'id' => [
-                'type' => 'BIGSERIAL',
-                'unsigned' => true,
-            ],
-            'nama' => [
-                'type' => 'VARCHAR',
-                'constraint' => '255',
-            ],
-            'email' => [
-                'type' => 'VARCHAR',
-                'constraint' => '100',
-                'unique' => true,
-            ],
-            'password' => [
-                'type'=>'VARCHAR',
-                'constraint'=>'255',
-            ],
-            'role' => [
-                'type' => 'VARCHAR',
-                'constraint' => '50'
-            ],
-            'unit_id' => [
-                'type' => 'BIGINT',
-                'unsigned' => true,
-            ],
-            'sub_units_id'=>[
-                'type' => 'BIGINT',
-                'unsigned' => true,
-                'null' => true,
-            ],
-            'created_at' => [
-                'type' => 'TIMESTAMPTZ',
-                'null' => true,
-            ],
-            'updated_at' => [
-                'type' => 'TIMESTAMPTZ',
-                'null' => true
-            ],
+            'id'        => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
+            'name'      => ['type' => 'VARCHAR', 'constraint' => 255],
+            'nim'     => ['type' => 'VARCHAR', 'constraint' => 255, 'unique' => true],
+            'password'  => ['type' => 'VARCHAR', 'constraint' => 255],
+            'unit_id'   => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true],
+            'role_id'   => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true],
+            'atasan_id' => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'null' => true],
+            'created_at' => ['type' => 'DATETIME', 'null' => true],
+            'updated_at' => ['type' => 'DATETIME', 'null' => true],
         ]);
         $this->forge->addKey('id', true);
-        $this->forge->addForeignKey('unit_id', 'units', 'id', 'CASCADE', 'CASCADE');
-        $this->forge->addForeignKey('sub_units_id', 'sub_units', 'id', 'CASCADE','CASCADE');
+        $this->forge->addForeignKey('unit_id', 'units', 'id');
+        $this->forge->addForeignKey('role_id', 'roles', 'id');
         $this->forge->createTable('users');
     }
 

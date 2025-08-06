@@ -14,12 +14,7 @@ class UnitsModel extends Model
     protected $protectFields    = true;
     protected $allowedFields    = [
     'nama',
-    'parent_id',
-    'id_asli',
-    'status',
-    'id_kelompok',
-    'id_bagian',
-    'kel_pro',
+    'parent_id'
 ];
 
     protected bool $allowEmptyInserts = true;

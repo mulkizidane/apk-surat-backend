@@ -16,7 +16,8 @@ class TujuanSuratKeluarModel extends Model
         'surat_keluar_id',
         'unit_id',
         'user_id',
-        'tipe_tujuan'
+        'tipe_tujuan',
+        'status_penerimaan'
     ];
 
     protected bool $allowEmptyInserts = false;

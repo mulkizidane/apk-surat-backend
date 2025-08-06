@@ -4,21 +4,20 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-class Units extends Migration
+class Roles extends Migration
 {
     public function up()
-    {
+    {// Migration for: roles
         $this->forge->addField([
             'id'        => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
-            'name'      => ['type' => 'VARCHAR', 'constraint' => 255],
-            'parent_id' => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'null' => true], // Untuk sub-unit
+            'role_name' => ['type' => 'VARCHAR', 'constraint' => 100, 'unique' => true],
         ]);
         $this->forge->addKey('id', true);
-        $this->forge->createTable('units');
+        $this->forge->createTable('roles');
     }
 
     public function down()
     {
-        $this->forge->dropTable('units');
+        $this->forge->dropTable('roles');
     }
 }

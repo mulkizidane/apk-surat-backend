@@ -13,14 +13,14 @@ class AuthController extends BaseController
 
     public function login()
     {
-        $email = $this->request->getVar('email');
+        $nim = $this->request->getVar('nim');
         $password = $this->request->getVar('password');
 
         $userModel = new UserModel();
-        $user = $userModel->where('email', $email)->first();
+        $user = $userModel->where('nim', $nim)->first();
 
         if (!$user || !password_verify($password, $user['password'])) {
-            return $this->failUnauthorized('Email atau Password salah');
+            return $this->failUnauthorized('Nim atau Password salah');
         }
 
         $key = getenv('JWT_SECRET_KEY');
@@ -31,7 +31,7 @@ class AuthController extends BaseController
             'iat' => $iat,
             'exp' => $exp,
             'uid' => $user['id'],
-            'email' => $user['email'],
+            'nim' => $user['nim'],
             'role' => $user['role'],
         ];
 

@@ -4,25 +4,15 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class SuratMasukModel extends Model
+class Roles extends Model
 {
-    protected $table            = 'surat_masuk';
+    protected $table            = 'roles';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $protectFields    = true;
-    protected $allowedFields    = [
-        'nomor_surat_asli',
-        'tanggal_surat',
-        'tanggal_diterima',
-        'pengirim',
-        'perihal',
-        'path_file',
-        'status',
-        'diunggah_oleh',
-        'original_surat_keluar_id',
-    ];
+    protected $allowedFields    = ['role_name'];
 
     protected bool $allowEmptyInserts = false;
     protected bool $updateOnlyChanged = true;
@@ -31,7 +21,8 @@ class SuratMasukModel extends Model
     protected array $castHandlers = [];
 
     // Dates
-    protected $useTimestamps = true;
+    protected $useTimestamps = false;
+    protected $dateFormat    = 'datetime';
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
     protected $deletedField  = 'deleted_at';
