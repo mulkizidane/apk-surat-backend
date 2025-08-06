@@ -45,6 +45,16 @@ $routes->group('api', ['filter' => 'jwt'], static function ($routes) {
     $routes->post('surat-masuk/(:num)/disposisi', 'DisposisiController::create/$1');
     $routes->get('kategori-surat', 'KategoriSuratController::index');
     $routes->get('jenis-surat', 'JenisSuratController::index');
-    $routes->get('tujuan-data', 'UnitController::getTujuanData');
+    $routes->get('units/tree', 'UnitController::getUnitUserTree');
+    
+    $routes->group('admin', static function ($routes) {
+        // Rute untuk mengelola data Users (CRUD)
+        $routes->resource('users', ['controller' => 'UserController']);
+        // Rute untuk mengelola data Units (CRUD)
+        $routes->resource('units', ['controller' => 'UnitController']);
+        // Rute untuk mengelola data Roles (CRUD)
+        // Anda perlu membuat RoleController jika ingin menggunakan ini.
+        // $routes->resource('roles', ['controller' => 'RoleController']);
+    });
     
 });

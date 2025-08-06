@@ -5,6 +5,7 @@ namespace App\Controllers;
 use CodeIgniter\RESTful\ResourceController;
 use App\Models\TujuanSuratKeluarModel;
 use App\Models\SuratKeluarModel;
+use App\Models\UserModel;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
@@ -64,56 +65,71 @@ class SuratKeluarController extends ResourceController
             $decoded = JWT::decode($token, new Key($key, 'HS256'));
             $loggedInUserId = $decoded->uid;
         } catch (\Exception $e) {
-            return $this->failUnauthorized('Token SALAH!!!');
+            return $this->failUnauthorized('Token tidak valid atau kedaluwarsa.');
         }
 
+        // === PERBAIKAN DIMULAI DI SINI ===
+        // 1. Ambil data lengkap user yang login untuk mendapatkan unit_id mereka
+        $userModel = new UserModel();
+        $currentUser = $userModel->find($loggedInUserId);
+
+        if (!$currentUser) {
+            return $this->failNotFound('User pembuat surat tidak ditemukan.');
+        }
+        // === SELESAI PERBAIKAN ===
+        
         $requestData = $this->request->getJSON();
         $db = \Config\Database::connect();
         $db->transStart();
 
-
         $suratKeluarModel = new SuratKeluarModel();
         $suratData = [
-            'nomor_surat'    => $requestData->nomor_surat ?? null,
-            'kategori_surat_id'       => $requestData->kategori_surat_id,
-            'jenis_surat_id'          => $requestData->jenis_surat_id,
-            'tanggal'        => $requestData->tanggal,
-            'isi'            => $requestData->isi,
-            'status'         => 'menunggu_verifikasi',
-            'unit_id'        => $requestData->unit_id,
-            'created_by'     => $loggedInUserId,
+            'nomor_surat'       => $requestData->nomor_surat ?? null,
+            'kategori_surat_id' => $requestData->kategori_surat_id,
+            'jenis_surat_id'    => $requestData->jenis_surat_id,
+            'tanggal'           => $requestData->tanggal,
+            'isi'               => $requestData->isi,
+            'status'            => 'menunggu_verifikasi',
+            'unit_id'           => $currentUser['unit_id'], // 2. Gunakan unit_id dari user yang login, bukan dari request
+            'created_by'        => $loggedInUserId,
         ];
 
         $suratKeluarModel->insert($suratData);
-
         $suratKeluarId = $suratKeluarModel->getInsertID();
 
-        $tujuanModel = new TujuanSuratKeluarModel();
-        foreach ($requestData->tujuan as $tujuan) {
-            $tujuanData = [
-                'surat_keluar_id' => $suratKeluarId,
-                'unit_id'         => $tujuan->unit_id ?? null,
-                'user_id'         => $tujuan->user_id ?? null,
-                'tipe_tujuan'     => $tujuan->tipe_tujuan,
-            ];
-            $tujuanModel->insert($tujuanData);
+        // Proses 'tujuan' jika ada
+        if (!empty($requestData->tujuan) && is_array($requestData->tujuan)) {
+            $tujuanModel = new TujuanSuratKeluarModel();
+            foreach ($requestData->tujuan as $tujuan) {
+                $tujuanData = [
+                    'surat_keluar_id' => $suratKeluarId,
+                    'unit_id'         => $tujuan->unit_id ?? null,
+                    'user_id'         => $tujuan->user_id ?? null,
+                    'tipe_tujuan'     => $tujuan->tipe_tujuan,
+                ];
+                $tujuanModel->insert($tujuanData);
+            }
         }
+        
+        // Proses 'approvers'
         $parafModel = new \App\Models\ParafSuratModel();
-
-        foreach ($requestData->approvers as $index => $approver) {
-        $parafModel->insert([
-                'surat_id' => $suratKeluarId,
-                'user_id'  => $approver->user_id,
-                'tipe'     => $approver->tipe, // 'paraf' atau 'ttd'
-                'status'   => ($index === 0) ? 'pending' : 'menunggu', // Hanya approver pertama yang langsung 'pending'
-            ]);
+        if (!empty($requestData->approvers) && is_array($requestData->approvers)) {
+            foreach ($requestData->approvers as $index => $approver) {
+                $parafModel->insert([
+                    'surat_id' => $suratKeluarId,
+                    'user_id'  => $approver->user_id,
+                    'tipe'     => $approver->tipe,
+                    'status'   => ($index === 0) ? 'pending' : 'menunggu',
+                ]);
+            }
         }
+        
         if ($db->transStatus() === false) {
-        $db->transRollback();
-        return $this->fail('Gagal menyimpan data surat.');
+            $db->transRollback();
+            return $this->fail('Gagal menyimpan data surat.');
         } else {
             $db->transCommit();
-            return $this-> respondCreated(['message' => 'Surat keluar berhasil dibuat.']);
+            return $this->respondCreated(['message' => 'Surat keluar berhasil dibuat.']);
         }
     }
 

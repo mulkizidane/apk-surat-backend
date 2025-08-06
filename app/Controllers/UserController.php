@@ -1,4 +1,6 @@
-<?php namespace App\Controllers;
+<?php
+
+namespace App\Controllers;
 
 use App\Models\UserModel;
 use CodeIgniter\API\ResponseTrait;
@@ -25,24 +27,38 @@ class UserController extends BaseController
         $userModel = new UserModel();
         $currentUser = $userModel->find($loggedInUserId);
 
+        if (!$currentUser) {
+            return $this->failNotFound('User tidak ditemukan.');
+        }
+
         $approvers = [];
 
-        // 1. Tambahkan "Diri Sendiri"
-        $approvers['diri_sendiri'] = $currentUser;
+        // 1. Tambahkan "Diri Sendiri" (jika diperlukan untuk paraf)
+        // $approvers['diri_sendiri'] = $currentUser;
 
         // 2. Cari "Atasan Langsung"
         if (!empty($currentUser['atasan_id'])) {
-            $approvers['atasan_langsung'] = $userModel->find($currentUser['atasan_id']);
+            $atasanLangsung = $userModel->find($currentUser['atasan_id']);
+            if ($atasanLangsung) {
+                $approvers['atasan_langsung'] = $atasanLangsung;
+            }
         }
 
         // 3. Cari "Pimpinan Unit"
+        // Query ini mencari user di unit yang sama, lalu join ke tabel roles
+        // untuk memastikan perannya adalah 'pimpinan_unit'
         $pimpinanUnit = $userModel
-            ->where('unit_id', $currentUser['unit_id'])
-            ->where('role', 'pimpinan_unit')
+            ->select('users.*')
+            ->join('roles', 'roles.id = users.role_id')
+            ->where('users.unit_id', $currentUser['unit_id'])
+            ->where('roles.role_name', 'pimpinan_unit') // Mencari berdasarkan nama peran
             ->first();
 
         if ($pimpinanUnit) {
-            $approvers['pimpinan_unit'] = $pimpinanUnit;
+            // Pastikan pimpinan unit bukan orang yang sama dengan atasan langsung
+            if (!isset($approvers['atasan_langsung']) || $approvers['atasan_langsung']['id'] !== $pimpinanUnit['id']) {
+                 $approvers['pimpinan_unit'] = $pimpinanUnit;
+            }
         }
 
         return $this->respond($approvers);
