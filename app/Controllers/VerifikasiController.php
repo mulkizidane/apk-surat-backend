@@ -5,16 +5,20 @@ namespace App\Controllers;
 use App\Models\ParafSuratModel;
 use CodeIgniter\API\ResponseTrait;
 use App\Models\SuratKeluarModel;
-use App\Models\TujuanSuratKeluarModel;
-use App\Models\SuratMasukModel;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
 class VerifikasiController extends BaseController
 {
     use ResponseTrait;
+
+    /**
+     * Mengupdate status verifikasi (paraf/ttd).
+     * @param int|null $id ID dari tabel paraf_surat
+     */
     public function update($id = null)
     {
+        // 1. Validasi Token JWT
         try {
             $key    = getenv('JWT_SECRET_KEY');
             $header = $this->request->getHeaderLine("Authorization");
@@ -22,73 +26,84 @@ class VerifikasiController extends BaseController
             $decoded = JWT::decode($token, new Key($key, 'HS256'));
             $loggedInUserId = $decoded->uid;
         } catch (\Exception $e) {
-            return $this->failUnauthorized('Token tidak valid');
+            return $this->failUnauthorized('Token tidak valid atau sudah kedaluwarsa.');
         }
+
+        // Inisialisasi Model
         $parafModel = new ParafSuratModel();
         $suratKeluarModel = new SuratKeluarModel();
+        
+        // 2. Cari data verifikasi berdasarkan ID yang dikirim
         $verifikasi = $parafModel->find($id);
+
+        // 3. Lakukan validasi
         if (!$verifikasi) {
             return $this->failNotFound('Data verifikasi tidak ditemukan.');
         }
         if ($verifikasi['user_id'] != $loggedInUserId) {
             return $this->failForbidden('Anda tidak memiliki hak untuk melakukan verifikasi ini.');
         }
+        if ($verifikasi['status'] !== 'pending') {
+            return $this->fail('Surat ini tidak sedang menunggu persetujuan Anda.', 400);
+        }
+
+        // Ambil data dari request frontend
         $requestData = $this->request->getJSON();
+        $suratId = $verifikasi['surat_id'];
+
+        // Mulai transaksi database untuk memastikan semua query berhasil
+        $this->db->transStart();
+
+        // 4. (FUNGSI BARU) Update Nomor Surat jika ada
+        // Ini hanya akan berjalan jika frontend mengirim 'nomor_surat' dan statusnya 'setuju'
+        if ($requestData->status === 'setuju' && !empty($requestData->nomor_surat)) {
+            // Update nomor surat di tabel surat_keluar
+            $suratKeluarModel->update($suratId, ['nomor_surat' => $requestData->nomor_surat]);
+        }
+        
+        // 5. Update status di tabel paraf_surat
         $dataToUpdate = [
             'status'  => $requestData->status,
             'catatan' => $requestData->catatan ?? null,
             'tanggal' => date('Y-m-d H:i:s'),
         ];
-
-        if ($parafModel->update($id, $dataToUpdate)) {
+        $parafModel->update($id, $dataToUpdate);
             
-            $suratId = $verifikasi['surat_id'];
-            if ($requestData->status === 'setuju') {
-                if ($verifikasi['tipe'] === 'paraf') {
-                    $suratKeluarModel->update($suratId, ['status' => 'menunggu_ttd']);
-                    $parafModel->where(['surat_id' => $suratId, 'tipe' => 'ttd'])
-                            ->set(['status' => 'pending'])
-                            ->update();
-                }
-                elseif ($verifikasi['tipe'] === 'ttd') {
-                    $suratKeluarModel->update($suratId, ['status' => 'disetujui']);
-                    $tujuanModel = new \App\Models\TujuanSuratKeluarModel();
-                    $semuaTujuan = $tujuanModel->where('surat_keluar_id', $suratId)->findAll();
+        // 6. Logika Alur Kerja (Workflow)
+        if ($requestData->status === 'setuju') {
+            // Cek apakah ada approver selanjutnya yang masih 'menunggu'
+            $nextApprover = $parafModel
+                ->where('surat_id', $suratId)
+                ->where('status', 'menunggu')
+                ->orderBy('id', 'ASC')
+                ->first();
 
-                    // 3. Ambil data surat keluar untuk di-copy ke surat masuk
-                    $suratKeluarData = $suratKeluarModel->find($suratId);
+            if ($nextApprover) {
+                // Jika ada, aktifkan approver selanjutnya dengan mengubah statusnya menjadi 'pending'
+                $parafModel->update($nextApprover['id'], ['status' => 'pending']);
+                $suratKeluarModel->update($suratId, ['status' => 'diproses']);
+            } else {
+                // Jika tidak ada lagi, berarti surat sudah disetujui sepenuhnya
+                $suratKeluarModel->update($suratId, ['status' => 'disetujui']);
+                
+                // Di sini bisa ditambahkan logika untuk membuat surat masuk internal secara otomatis
+            }
 
-                    // 4. Buat record baru di surat_masuk untuk setiap tujuan internal
-                    $suratMasukModel = new \App\Models\SuratMasukModel();
-
-                    foreach ($semuaTujuan as $tujuan) {
-                        // Cek jika tujuannya adalah unit internal (bukan perorangan atau tujuan eksternal)
-                        if (!empty($tujuan['unit_id'])) {
-                            $dataSuratMasuk = [
-                                'nomor_surat_asli' => $suratKeluarData['nomor_surat']?? 'INTERNAL-' . $suratId, // atau nomor lain yang sesuai
-                                'tanggal_surat'    => $suratKeluarData['tanggal'],
-                                'tanggal_diterima' => date('Y-m-d'),
-                                'pengirim'         => 'Unit Internal: ' . $suratKeluarData['unit_id'], // Info pengirim internal
-                                'perihal'          => $suratKeluarData['isi'],
-                                'path_file'        => '',
-                                'status'           => 'baru',
-                                'diunggah_oleh'    => 1,
-                                'original_surat_keluar_id' => $suratId,
-                            ];
-                            $suratMasukModel->insert($dataSuratMasuk);
-                        }
-                    }
-                }
-            }
-            elseif ($requestData->status === 'revisi') {
-                $suratKeluarModel->update($suratId, ['status' => 'revisi']);
-            }
-            elseif ($requestData->status === 'tolak') {
-                $suratKeluarModel->update($suratId, ['status' => 'ditolak']);
-            }
-            return $this->respondUpdated(['message' => 'Verifikasi berhasil disimpan.']);
+        } elseif ($requestData->status === 'revisi') {
+            // Jika direvisi, update status surat utama menjadi 'revisi'
+            $suratKeluarModel->update($suratId, ['status' => 'revisi']);
+        } elseif ($requestData->status === 'tolak') {
+            // Jika ditolak, update status surat utama menjadi 'ditolak'
+            $suratKeluarModel->update($suratId, ['status' => 'ditolak']);
         }
         
-        return $this->fail($parafModel->errors());
+        // Selesaikan transaksi database
+        if ($this->db->transStatus() === false) {
+            $this->db->transRollback();
+            return $this->fail('Gagal menyimpan data verifikasi.');
+        } else {
+            $this->db->transCommit();
+            return $this->respondUpdated(['message' => 'Verifikasi berhasil disimpan.']);
+        }
     }
 }

@@ -55,7 +55,10 @@ class SuratKeluarModel extends Model
 
     public function getSuratDetail($id)
     {
-        $surat = $this->select('surat_keluar.*, users.nama as nama_pembuat, units.nama as nama_unit_pembuat')
+        // === PERBAIKAN DI SINI ===
+        // Mengganti "users.nama" menjadi "users.name"
+        // Mengganti "units.nama" menjadi "units.name"
+        $surat = $this->select('surat_keluar.*, users.name as nama_pembuat, units.name as nama_unit_pembuat')
                     ->join('users', 'users.id = surat_keluar.created_by')
                     ->join('units', 'units.id = surat_keluar.unit_id')
                     ->where('surat_keluar.id', $id)
@@ -66,13 +69,22 @@ class SuratKeluarModel extends Model
         }
 
         $tujuanModel = new \App\Models\TujuanSuratKeluarModel();
-        $tujuan = $tujuanModel->select('tujuan_surat_keluar.*, units.nama as nama_unit_tujuan, users.nama as nama_user_tujuan')
+        $tujuan = $tujuanModel->select('tujuan_surat_keluar.*, units.name as nama_unit_tujuan, users.name as nama_user_tujuan')
                             ->join('units', 'units.id = tujuan_surat_keluar.unit_id', 'left')
                             ->join('users', 'users.id = tujuan_surat_keluar.user_id', 'left')
                             ->where('surat_keluar_id', $id)
                             ->findAll();
         
         $surat['tujuan'] = $tujuan;
+
+        $parafModel = new \App\Models\ParafSuratModel();
+        $approvers = $parafModel->select('paraf_surat.*, users.name as approver_name')
+                                ->join('users', 'users.id = paraf_surat.user_id')
+                                ->where('surat_id', $id)
+                                ->orderBy('id', 'ASC')
+                                ->findAll();
+
+        $surat['approvers'] = $approvers;
 
         return $surat;
     }
